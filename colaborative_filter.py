@@ -9,6 +9,8 @@ import csv
 from scipy import sparse
 
 
+tf.enable_eager_execution()
+
 # Get a new directory to hold checkpoints from a neural network.  This allows the neural network to be
 # loaded later.  If the erase param is set to true, the contents of the directory will be cleared.
 def get_model_dir(name,erase):
@@ -20,13 +22,24 @@ def get_model_dir(name,erase):
     return model_dir
 
 
-def loadCSVasSparse(rows,columns,fileName):
+# Load a Netflix file in the format USER x MOVIE
+# Return: the sparse matrix, number of lines and number of columns
+def loadCSVasSparse(fileName):
+
+    filehandle = open(fileName,'r')
+    csvreader = csv.reader(filehandle)
+    rows = sum(1 for row in csvreader)
+    filehandle.seek(0)
+    row = next(csvreader)
+    columns = len(row)
     matrix = sparse.lil_matrix((rows, columns))
-    csvreader = csv.reader(open(fileName))
+    filehandle.seek(0)
     for i,line in enumerate(csvreader):
         matrix[i,] = np.array(line,dtype=int)
 
-    return matrix
+    numberOfColumns = len(line)
+
+    return matrix, i, numberOfColumns
 
 def normaliseSparse(A,axis=1):
     if (not sparse.issparse(A)):
@@ -51,9 +64,6 @@ print("Tensor Flow Version: {}".format(tf.__version__))
 #from keras import backend
 #backend.set_floatx('int32')
 
-tf.enable_eager_execution()
-sess = tf.Session()
-
 def pack_features_vector(features):
   """Pack the features into a single array."""
   features = tf.stack(list(features.values()), axis=1)
@@ -70,61 +80,38 @@ def pack_features_vector(features):
 batch_size = 1
 
 #train_dataset = tf.contrib.data.make_csv_dataset(
-train_dataset = tf.data.experimental.make_csv_dataset(
-    ['data_1.csv'],
-    #predictors,
-    batch_size,
-    column_names=None,
-    label_name=None,
-    num_epochs=1,
-    header=True)
-
-
-train_dataset = train_dataset.map(pack_features_vector)
+# train_dataset = tf.data.experimental.make_csv_dataset(
+#     ['data_1_user_movie.csv'],
+#     #predictors,
+#     batch_size,
+#     column_names=None,
+#     label_name=None,
+#     num_epochs=1,
+#     header=False)
+#
+#
+# train_dataset = train_dataset.map(pack_features_vector)
 
 #features, labels = next(iter(train_dataset))
-
-
-def grad(model, inputs, targets):
-  with tf.GradientTape() as tape:
-    loss_value = loss(model, inputs, targets)
-  return loss_value, tape.gradient(loss_value, model.trainable_variables)
-
-def loss(model, x, y, pred):
-  y_ = model(x)
-  #return tf.losses.sparse_softmax_cross_entropy(labels=y, logits=y_)
-  return tf.losses.mean_squared_error(labels=y, predictions=pred)
 
 
 # iterator = train_dataset.make_initializable_iterator()
 # sess.run(iterator.initializer)
 # features, labels = iterator.get_next()
 
-def get_model():
+def get_model(input, classes):
     model = tf.keras.Sequential()
-    model.add(tf.keras.layers.Dense(1000, activation=tf.nn.relu, input_shape=(train_dataset.output_shapes[1],) ))  # input shape required)
-    model.add(tf.keras.layers.Dense(1000, activation=tf.nn.relu))
-    model.add(tf.keras.layers.Dense(train_dataset.output_shapes[1]))
+    model.add(tf.keras.layers.Dense(100, activation=tf.nn.relu, input_shape=(input,) ))  # input shape required)
+    model.add(tf.keras.layers.Dense(100, activation=tf.nn.relu))
+    model.add(tf.keras.layers.Dense(classes))
     #model.compile(loss='mean_squared_error', optimizer=tf.train.AdamOptimizer(learning_rate=0.01),
     #              metrics=['mean_absolute_error', 'mean_squared_error'])
     return model
 
-optimizer = tf.train.AdamOptimizer(learning_rate=0.01)
-global_step = tf.Variable(0)
-
-# keep results for plotting
-train_loss_results = []
-train_accuracy_results = []
-from tensorflow import contrib
-tfe = contrib.eager
-num_epochs = 10
-model = get_model()
-
-
 # Function to read a specifc line from NetFlix file
-def getLine(lineToRead):
- with open('data_1.csv','rb') as file:
-    next(file) # skip heather
+def getLine(lineToRead, file):
+ with open(file,'rb') as file:
+    #next(file) # skip header  - no header anymore
     if (lineToRead == 1):
         line = file.readline().decode('utf-8')
     else:
@@ -132,37 +119,67 @@ def getLine(lineToRead):
         line = file.readline().decode('utf-8')
         length = len(line) # size of all rows except for the heather
         file.seek(0,0)
-        next(file)
+        #next(file)  - no header anymore
+        # -1 because file pointer begins in 0
         file.seek((lineToRead-1)*length,1) # access line 30878 through the current position
         line = file.readline().decode('utf-8')
         return line
 
-# Train for user 30878
-lineToRead = 30878
-user_30878 = np.array(getLine(lineToRead).split(',')) # movies rated from user
-sparseMatrix = loadCSVasSparse(100001,4499,'data_1.csv')
-#Normalize to improve calculation of cosine similarity
-sparseMatrixNormalized = normaliseSparse(sparseMatrix)
-x = tf.cast(user_30878, dtype=tf.float32)
+#Build the sparse matrix of all movies
+dataset = ['data_1_user_movie.csv','data_2_user_movie.csv']#,'data_3_user_movie.csv']#,'data_4_user_movie.csv']
+normalizedSparseMatrix = sparse.lil_matrix((0, 0))
+for file in dataset:
+    sparseMatrix, numberOfLines, numberOfColumns = loadCSVasSparse(file)
+    sparseMatrix = normaliseSparse(sparseMatrix)
+    normalizedSparseMatrix = sparse.hstack([normalizedSparseMatrix,sparseMatrix])
 
+normalizedSparseMatrix = normalizedSparseMatrix.asformat('csr')
+# Train for user 30878
+#lineToRead = 30878
+#user_30878 = np.array(getLine(lineToRead, file).split(','), dtype=int)  # movies rated from user
+#user_30878 = normaliseSparse(sparse.csr_matrix(user_30878[0:4000]))
+user_30878 = normalizedSparseMatrix[30878-1,]
+x = tf.cast(user_30878.toarray(), dtype=tf.float32)
+
+
+optimizer = tf.train.AdamOptimizer(learning_rate=0.01)
+global_step = tf.Variable(0)
+#sess = tf.Session()
+
+# keep results for plotting
+train_loss_results = []
+train_accuracy_results = []
+from tensorflow import contrib
+tfe = contrib.eager
+num_epochs = 1
+model = get_model(normalizedSparseMatrix.shape[1],normalizedSparseMatrix.shape[1])
+
+
+max_cossine = 0.0
+count = 0
 for epoch in range(num_epochs):
     epoch_loss_avg = tfe.metrics.Mean()
     epoch_accuracy = tfe.metrics.Accuracy()
 
     # Training loop
     #for x in train_dataset:
-    for y in sparseMatrixNormalized:
+      #for i in range(0,numberOfLines):
+    for y in normalizedSparseMatrix:
         # Optimize the model
+        #y = sparseMatrix[i,0:4000]
+        cosine_similarity = float((user_30878 @  y.transpose()).toarray())
+        if round((cosine_similarity),2) > max_cossine and round((cosine_similarity),2) < 0.99:
+            max_cossine = cosine_similarity
 
-        cosine_similarity = user_30878@y
-        if (cosine_similarity < 0.8):
+        if (cosine_similarity < 0.5):
             continue
 
+        count += 1
         y = tf.cast(y.todense(), dtype=tf.float32)
-
 
         with tf.GradientTape() as tape:
             pred = model(x)
+            #pred = np.ones((1,normalizedSparseMatrix.shape[1]))*10
             loss_value = tf.losses.mean_squared_error(labels=y, predictions=pred)
         grads = tape.gradient(loss_value, model.trainable_variables)
         optimizer.apply_gradients(zip(grads, model.trainable_variables), global_step)
@@ -182,3 +199,5 @@ for epoch in range(num_epochs):
                                                                     epoch_accuracy.result()))
 
 model.save('my_model.h5')
+print("Max cossine: ", max_cossine)
+print("Number of neighboors: ", count)

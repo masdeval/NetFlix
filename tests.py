@@ -42,7 +42,7 @@ print(cosine(user1.reshape(1,-1),user2.reshape(1,-1)))
 
 ## Como posicionar ponteiro de arquivo numa linha especifica
 lineToRead = 2
-with open('data_1.csv','rb') as file:
+with open('data_1_user_movie.csv','rb') as file:
     next(file) # skip heather
     if (lineToRead == 1):
         line = file.readline().decode('utf-8')
@@ -95,6 +95,7 @@ print('\n\n')
 A = csr_matrix(A)
 vector1 = A[0,]
 vector2 = A[0,]
+
 print(cosine(vector1.reshape(1,-1),vector2.reshape(1,-1)))
 #print(A.multiply(A).todense()) # element multiplication
 #print((A*A).todense()) # matrix multiplication
@@ -103,4 +104,14 @@ print(cosine(vector1.reshape(1,-1),vector2.reshape(1,-1)))
 A_normalized = normaliseSparse(A)
 vector1 = A_normalized[0,]
 vector2 = A_normalized[0,].transpose()
-print(vector1@vector2)
+print(vector1 @ vector2)
+
+print('\n\n')
+
+import tensorflow as tf
+tf.enable_eager_execution()
+y = tf.cast(user1, dtype=tf.float32)
+pred = tf.cast(user2, dtype=tf.float32)
+with tf.GradientTape() as tape:
+ loss_value = tf.losses.mean_squared_error(labels=y, predictions=pred)
+print(loss_value)

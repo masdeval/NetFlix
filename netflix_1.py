@@ -7,7 +7,7 @@ def createTrainData():
 
     dir = "/home/christian/data_analyse/NetFlix/netflix-prize-data/"
     data = defaultdict(lambda : defaultdict(lambda : 0))
-    path = [dir + "combined_data_1.txt"]#,dir+"combined_data_2.txt",dir+"combined_data_3.txt"]
+    path = [dir + "combined_data_2.txt"]#,dir+"combined_data_2.txt",dir+"combined_data_3.txt"]
 
     for file in path:
          with open(file, encoding='latin-1') as f:
@@ -23,7 +23,6 @@ def createTrainData():
     resultFile = open("users_id.txt", "r")
     users = resultFile.readline().split(',') #user id
     resultFile.close()
-    resultFile = open("data_1.csv", "a")
     movies = sorted(list(data.keys()))  # movies id
 
     # create a file MOVIE x USER
@@ -37,17 +36,15 @@ def createTrainData():
 
 
     # create file USER x MOVIE
-    resultFile = open("data_1.csv","w")
-    for x in range(1,100000): #only 100000 users
-        line = list()
+    resultFile = open("data_2.csv","w")
+    line = list()
+    for x in  users: #range(1,100000): #only 100000 users
         #line.append(rows[x]) # movie id
-        for y in range(1,1000): #only 1000 movies
+        for y in movies: #range(1,1000): #only 1000 movies
             #some columns will be all zeros as there are gaps in the users id
             #the advantage is that we can seek the user using its id as the line number
             line.append(data[int(movies[y])][int(users[x])])
         resultFile.write(','.join([str(v) for v in line])+'\n')
-
-
     resultFile.close()
 
 createTrainData()
