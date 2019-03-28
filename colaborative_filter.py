@@ -126,7 +126,7 @@ def getLine(lineToRead, file):
         return line
 
 #Build the sparse matrix of all movies
-dataset = ['data_1_user_movie.csv','data_2_user_movie.csv']#,'data_3_user_movie.csv']#,'data_4_user_movie.csv']
+dataset = ['data_1_user_movie.csv','data_2_user_movie.csv','data_3_user_movie.csv']#,'data_4_user_movie.csv']
 normalizedSparseMatrix = sparse.lil_matrix((0, 0))
 for file in dataset:
     sparseMatrix, numberOfLines, numberOfColumns = loadCSVasSparse(file)
@@ -151,7 +151,7 @@ train_loss_results = []
 train_accuracy_results = []
 from tensorflow import contrib
 tfe = contrib.eager
-num_epochs = 1
+num_epochs = 5
 model = get_model(normalizedSparseMatrix.shape[1],normalizedSparseMatrix.shape[1])
 
 
@@ -171,7 +171,7 @@ for epoch in range(num_epochs):
         if round((cosine_similarity),2) > max_cossine and round((cosine_similarity),2) < 0.99:
             max_cossine = cosine_similarity
 
-        if (cosine_similarity < 0.5):
+        if (cosine_similarity < 0.6):
             continue
 
         count += 1
@@ -179,8 +179,7 @@ for epoch in range(num_epochs):
 
         with tf.GradientTape() as tape:
             pred = model(x)
-            #pred = np.ones((1,normalizedSparseMatrix.shape[1]))*10
-            loss_value = tf.losses.mean_squared_error(labels=y, predictions=pred)
+            loss_value = tf.losses.cosine_distance(labels=y, predictions=pred,axis=0)
         grads = tape.gradient(loss_value, model.trainable_variables)
         optimizer.apply_gradients(zip(grads, model.trainable_variables), global_step)
 
@@ -201,3 +200,6 @@ for epoch in range(num_epochs):
 model.save('my_model.h5')
 print("Max cossine: ", max_cossine)
 print("Number of neighboors: ", count)
+
+
+#-144816456.647

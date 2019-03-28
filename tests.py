@@ -113,5 +113,12 @@ tf.enable_eager_execution()
 y = tf.cast(user1, dtype=tf.float32)
 pred = tf.cast(user2, dtype=tf.float32)
 with tf.GradientTape() as tape:
- loss_value = tf.losses.mean_squared_error(labels=y, predictions=pred)
+ loss_value = tf.losses.cosine_distance(labels=y, predictions=pred,axis=0)
 print(loss_value)
+
+
+import os
+
+files = os.listdir("./neighbors")
+if files.__contains__("439\n.txt"):
+    print('coco');
